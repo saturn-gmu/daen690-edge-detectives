@@ -1,0 +1,43 @@
+# Attempting the wavelet transform (WT) in python
+
+import librosa
+import os
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.io import wavfile
+from tqdm import tqdm
+from scipy.signal import cwt, morlet
+mport wave
+import contextlib
+
+
+# step 1: load in the WAV file
+signal, rate= librosa.load("D:/DAEN 690/QiandaoEar22/speedboat_other_001/001/20220624101843_S_No7_N_S_0_label__0__1 - 副本.wav", sr=22050)
+
+# set the wavelet scales 
+scales= np.arange(1,100)
+
+from scipy.signal import cwt, morlet
+# perform continuous wavelet transform with the Morlet wavelet
+coefficients= cwt(signal, morlet, scales)
+
+duration= librosa.get_duration(y=signal, sr=rate)
+
+## display the original signal -> not working rn
+#plt.figure(figsize= (20,11))
+#plt.subplot(2,1,1)
+#plt.plot(duration, signal)
+#plt.title('Original Signal (Time Domain)')
+#plt.xlabel('Time [s]')
+#plt.ylabel('Amplitude')
+
+# Step 2: plot the wavelet transform
+plt.subplot(2,1,2)
+plt.imshow(np.abs(coefficients), extent= [0,1,1,100], cmap='PRGn', aspect='auto',
+           vmax= abs(coefficients).max(), vmin= -abs(coefficients).max())
+plt.title('Wavelet Transform (Time-Frequency Domain)')
+plt.xlabel('Time [s]')
+plt.ylabel('Scale')
+plt.tight_layout()
+plt.show()
