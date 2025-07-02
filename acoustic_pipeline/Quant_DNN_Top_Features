@@ -1,0 +1,94 @@
+# README.md
+
+This guide outlines the correct order for running the **baseline full DNN model** and the **quantized INT8 DNN model** using top 20 bottleneck features.
+
+---
+## 🔹 Step 1: Run Baseline Full DNN Model (All Features)
+
+Run this script to generate the baseline model and extract bottleneck features:
+
+```bash
+python main.py
+```
+
+**What it does:**
+- Trains a full-resolution DNN using all 168 input features (84 mean + 84 std)
+- Saves bottleneck outputs (64D) for downstream usage
+- Evaluates performance (accuracy, precision)
+
+**Outputs:**
+- `artifacts/quant_dnn/dnn_model.h5`
+- `artifacts/quant_dnn/features_scaled.npz`
+
+---
+## 🔹 Step 2: (Optional) Run Feature Ablation
+
+Generate a 64D → 20D mask using Random Forest feature importance:
+
+```bash
+python run_ablation.py
+```
+
+**Output:**
+- `artifacts/thresholded/feature_mask_20.npy`
+
+---
+## 🔹 Step 3: Train + Quantize Top-20 DNN Model
+
+Use bottleneck outputs + top-20 mask to train a small model, then quantize to INT8:
+
+```bash
+python pipeline_quant_top20.py
+```
+
+**What it does:**
+- Loads bottleneck vectors
+- Applies 64D → 20D feature mask
+- Trains a compact DNN
+- Converts model to quantized `.tflite`
+- Evaluates both float32 and INT8 model
+
+**Outputs:**
+- `artifacts/quant_top_features/dnn_model.h5`
+- `artifacts/tflite/dnn_model_top20_int8.tflite`
+- `results/top20_bottleneck_dnn_performance.png`
+
+---
+## 🔹 Step 4: Run Inference on Quantized Model
+
+Evaluate predictions from the INT8 model:
+
+```bash
+python int8_top_20_features.py
+```
+
+**What it does:**
+- Loads INT8 `.tflite` model
+- Runs inference on saved test set
+- Displays predictions and metrics
+
+---
+## 🔹 (Optional) Compare Full vs Quantized Model
+
+Visualize the difference between full and quantized pipelines:
+
+```bash
+python main_compare_pipelines.py
+```
+
+**Output:**
+- `results/compare_full_vs_quantized.png`
+
+---
+## ✅ Script Summary
+
+| Script                        | Purpose                              |
+|------------------------------|--------------------------------------|
+| `main.py`                    | Train baseline full-resolution DNN   |
+| `run_ablation.py`            | Select top-20 bottleneck features    |
+| `pipeline_quant_top20.py`    | Train and quantize top-20 DNN model  |
+| `int8_top_20_features.py`    | Run inference using INT8 `.tflite`   |
+| `main_compare_pipelines.py`  | Compare performance and plot metrics |
+
+---
+Run the scripts above in order to build and evaluate both your baseline and deployable models.
