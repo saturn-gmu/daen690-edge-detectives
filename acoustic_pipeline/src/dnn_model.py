@@ -1,60 +1,52 @@
 # dnn_model.py
-# This module defines and trains a deep neural network (DNN) classifier,
-# and extracts bottleneck features for hybrid modeling.
+# Provides a simplified DNN architecture for binary classification.
 
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, Dense, Dropout, BatchNormalization
-from tensorflow.keras.regularizers import l2
+from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
-from tensorflow.keras.metrics import Precision
-from tensorflow.keras.utils import to_categorical
-import numpy as np
 
-# Build and train a simple fully connected DNN model
-def train_dnn_model(X_train, y_train, X_val, y_val):
-    # Define the model architecture
-    input_layer = Input(shape=(X_train.shape[1],))
-
-    # First dense hidden layer with L2 regularization, batch norm, and dropout
-    x = Dense(128, activation='relu', kernel_regularizer=l2(1e-4))(input_layer)
-    x = BatchNormalization()(x)
+def build_consistent_dnn_model(input_shape):
+    """
+    Builds a consistent DNN model for classification using the given input shape.
+    
+    Parameters:
+    - input_shape: tuple, e.g. (64,) representing the number of input features
+    
+    Returns:
+    - Compiled Keras model
+    """
+    inputs = Input(shape=input_shape, name="input")
+    x = Dense(128, activation='relu')(inputs)
     x = Dropout(0.3)(x)
+    x = Dense(64, activation='relu')(x)
+    x = Dropout(0.3)(x)
+    outputs = Dense(1, activation='sigmoid')(x)
 
-    # Bottleneck layer (used later for feature extraction)
-    bottleneck = Dense(64, activation='relu', name='bottleneck', kernel_regularizer=l2(1e-4))(x)
-    x = Dropout(0.3)(bottleneck)
+    model = Model(inputs=inputs, outputs=outputs)
+    return model
 
-    # Output layer: 2-class softmax
-    output = Dense(2, activation='softmax')(x)
+def train_dnn_model(X_train, y_train, X_val, y_val, input_shape=None):
+    """Trains the simplified DNN model with early stopping."""
+    if input_shape is None:
+        input_shape = (X_train.shape[1],)
+    elif isinstance(input_shape, int):
+        input_shape = (input_shape,)
 
-    # Compile the model
-    model = Model(inputs=input_layer, outputs=output)
-    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy', Precision(name='precision')])
+    model = build_consistent_dnn_model(input_shape)
+    model.compile(optimizer=Adam(learning_rate=0.001), loss="binary_crossentropy", metrics=["accuracy"])
 
-    # Use early stopping to prevent overfitting
-    early_stop = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+    early_stop = EarlyStopping(monitor="val_loss", patience=5, restore_best_weights=True)
 
-    # Train the model
     history = model.fit(
-        X_train, to_categorical(y_train),
-        validation_data=(X_val, to_categorical(y_val)),
-        epochs=15,
-        batch_size=32,
-        callbacks=[early_stop]
+        X_train,
+        y_train,
+        validation_data=(X_val, y_val),
+        epochs=50,
+        batch_size=64,
+        callbacks=[early_stop],
+        verbose=1
     )
 
     return model, history
 
-# Extract bottleneck features from the trained DNN
-def extract_bottleneck_features(model, X_train, X_test, scaler, df):
-    # Define a new model that outputs from the bottleneck layer
-    bottleneck_model = Model(inputs=model.input, outputs=model.get_layer("bottleneck").output)
-
-    # Transform training and test sets
-    X_train_b = bottleneck_model.predict(X_train)
-    X_test_b = bottleneck_model.predict(X_test)
-
-    # Transform all feature vectors for full-dataset RF evaluation
-    X_all_b = bottleneck_model.predict(scaler.transform(np.vstack(df['features'].values)))
-
-    return X_train_b, X_test_b, X_all_b
