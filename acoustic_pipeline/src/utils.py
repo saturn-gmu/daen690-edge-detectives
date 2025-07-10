@@ -1,5 +1,7 @@
+# utils.py
 # This utility module provides simple timing functions to measure execution time and signal diagnostics.
 
+import os
 import time
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,9 +12,10 @@ def start_timer():
     return time.time()
 
 # Calculate and print the elapsed time since `start_time`
-def end_timer(start_time):
-    end = time.time()
-    print(f"\n⏱️ Total Execution Time: {end - start_time:.2f} seconds")
+def end_timer(start):
+    elapsed = time.time() - start
+    print(f"⏱️ Total time elapsed: {elapsed:.2f} seconds")
+    return elapsed  # ✅ add this line
 
 # Compare average spectrograms of original vs. filtered signals
 def compare_average_spectrogram(originals, filtereds, sr, title="Average Spectrogram Comparison"):
@@ -47,4 +50,6 @@ def compare_average_spectrogram(originals, filtereds, sr, title="Average Spectro
 
     plt.suptitle(title)
     plt.tight_layout()
-    plt.show()
+    os.makedirs("results", exist_ok=True)
+    plt.savefig("results/spectrogram_comparison.png")
+    plt.close()
