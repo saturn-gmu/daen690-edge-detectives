@@ -1,8 +1,10 @@
+#config.py
+# This configuration file contains parameters for the DNN model, data loading, and feature extraction.  
 
 # Dataset location and vessel filtering
 folder_path = "/Users/christopherhurtig/Desktop/QiandaoEar22_filtered"
-vesselnames = r"SpeedBoat|Qiandao|KaiYuan|No7|UUV|GreenCity|TheEarl|Cargo|FishBoat|Unknown|TheKnight|WorkShip|ArtificialSignals|BigPassengerShip|PoliceBoat|MotorBoat|Car|CivilianBoats|No5|Helicopter"
-vessel = "SpeedBoat"
+vesselnames = "SpeedBoat|QianDao|KaiYuan|No7|UUV|GreenCity|TheEarl|Cargo|FishBoat|Unknown|TheKnight|WorkShip|ArtificialSignals|BigPassengerShip|PoliceBoat|MotorBoat|Car|CivilianBoats|No5|Helicopter"
+vessel = "No7"  # Default vessel for training, can be overridden
 
 # Bandpass filter configuration
 bandpass_low = 20
@@ -20,5 +22,8 @@ fmin = 8.0               # Keep minimum frequency the same
 # DNN training configuration
 epochs = 15
 batch_size = 32
+
+
+
 
 
