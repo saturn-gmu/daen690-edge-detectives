@@ -1,169 +1,93 @@
 # rf_model.py
-# Train Random Forest and visualize feature importances across multiple dimensions
+# This file contains functions to plot cumulative and dynamic feature importance for a Random Forest model,
+# as well as model evaluation curves like confusion matrix, ROC, and precision-recall curves.
+# It assumes the model has been trained and the necessary libraries are installed.
 
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.inspection import permutation_importance
-import os
-import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
-from collections import defaultdict
+import numpy as np
+import os
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import (
+    confusion_matrix, ConfusionMatrixDisplay,
+    roc_curve, precision_recall_curve, auc
+)
 
-# Train a Random Forest classifier with class balancing and 100 trees
-def train_random_forest(X, y):
-    rf = RandomForestClassifier(n_estimators=100, class_weight='balanced', random_state=42)
-    rf.fit(X, y)
+def train_random_forest(X_train, y_train, random_state=42):
+    rf = RandomForestClassifier(n_estimators=100, class_weight='balanced', random_state=random_state)
+    rf.fit(X_train, y_train)
     return rf
 
-# Plot feature importance grouped by flat frequency bins (e.g., every 10 Hz)
-def plot_importance_binned_by_frequency(importances, freq_labels, bin_width=10, title="Feature Importance by Frequency Band", filename="results/frequency_band_importance.png"):
-    freqs = [int(label.split()[0]) for label in freq_labels]
-    binned = defaultdict(list)
+def plot_cumulative_and_dynamic_importance(model, save_path="results/feature_importance_rf.png"):
+    importances = model.feature_importances_
+    sorted_indices = np.argsort(importances)[::-1]
+    sorted_importances = importances[sorted_indices]
+    cumulative = np.cumsum(sorted_importances)
 
-    for freq, imp in zip(freqs, importances):
-        lower = ((freq - 1) // bin_width) * bin_width + 1
-        upper = lower + bin_width - 1
-        bin_label = f"{lower}-{upper} Hz"
-        binned[bin_label].append(imp)
-
-    sorted_bins = sorted(binned.keys(), key=lambda x: int(x.split('-')[0]))
-    values = [np.mean(binned[bin_label]) for bin_label in sorted_bins]
-
-    plt.figure(figsize=(14, 6))
-    plt.bar(sorted_bins, values, color="seagreen")
-    plt.xlabel("Frequency Range (Hz)")
-    plt.ylabel("Average Importance")
-    plt.title(title)
-    plt.xticks(rotation=45, ha="right")
-    plt.tight_layout()
-    plt.savefig(filename)
-    plt.show()
-    print(f"Saved: {filename}")
-
-# Visualize RF feature importance (top-N, sorted by frequency)
-def plot_rf_feature_importance(rf, top_n=400):
-    n_bins = rf.feature_importances_.shape[0] // 2
-    bins_per_octave = 12
-    fmin = 8.0
-    freqs = fmin * 2.0 ** (np.arange(n_bins) / bins_per_octave)
-    freq_labels = [f"{int(freqs[i])} Hz (mean)" for i in range(n_bins)] + \
-                  [f"{int(freqs[i])} Hz (std)" for i in range(n_bins)]
-
-    importances = rf.feature_importances_
-    indices = np.argsort(importances)[-top_n:][::-1]
-    top_features = [freq_labels[i] for i in indices]
-    top_importances = importances[indices]
-
-    sorted_idx = sorted(indices, key=lambda i: freqs[i % n_bins])
-    sorted_features = [freq_labels[i] for i in sorted_idx]
-    sorted_importances = [importances[i] for i in sorted_idx]
-
-    os.makedirs("results", exist_ok=True)
-
-    plt.figure(figsize=(12, 8))
-    plt.barh(sorted_features[::-1], sorted_importances[::-1], color='teal')
-    plt.xlabel("Feature Importance")
-    plt.title(f"Top {top_n} RF Features Sorted by Frequency")
-    plt.tight_layout()
-    plt.savefig("results/rf_features_sorted_by_frequency.png")
-    plt.show()
-    print("Saved: results/rf_features_sorted_by_frequency.png")
-
-    plot_importance_binned_by_frequency(importances, freq_labels, bin_width=10,
-        title="RF Importance Grouped by Frequency Bands (10Hz)",
-        filename="results/rf_binned_by_frequency_band.png")
-
-# Visualize permutation-based feature importance by frequency
-def plot_permutation_importance_by_frequency(rf, X_test, y_test, top_n=40):
-    print("Computing permutation importances...")
-    result = permutation_importance(rf, X_test, y_test, n_repeats=10, random_state=42)
-    importances = result.importances_mean
-
-    n_bins = X_test.shape[1] // 2
-    bins_per_octave = 12
-    fmin = 8.0
-    freqs = fmin * 2.0 ** (np.arange(n_bins) / bins_per_octave)
-    freq_labels = [f"{int(freqs[i])} Hz (mean)" for i in range(n_bins)] + \
-                  [f"{int(freqs[i])} Hz (std)" for i in range(n_bins)]
-
-    indices = np.argsort(importances)[-top_n:][::-1]
-    top_features = [freq_labels[i] for i in indices]
-    top_importances = importances[indices]
-
-    os.makedirs("results", exist_ok=True)
-    plt.figure(figsize=(12, 8))
-    plt.barh(top_features[::-1], top_importances[::-1], color='slateblue')
-    plt.xlabel("Permutation Importance")
-    plt.title(f"Top {top_n} Permutation Importance Features by Frequency")
-    plt.tight_layout()
-    plt.savefig("results/permutation_importance_by_frequency.png")
-    plt.show()
-    print("Saved: results/permutation_importance_by_frequency.png")
-
-    plot_importance_binned_by_frequency(top_importances, top_features, bin_width=10,
-        title="Permutation Importance by Frequency Bands (10Hz)",
-        filename="results/permutation_binned_by_frequency_band.png")
-
-# Enhanced: Cumulative and Dynamic Binned Importance (≤ 100 Hz)
-def plot_cumulative_and_dynamic_importance(rf_model, title_prefix="RF Feature Importance", save_dir="results"):
-    os.makedirs(save_dir, exist_ok=True)
-
-    n_bins = rf_model.feature_importances_.shape[0] // 2
-    bins_per_octave = 12
-    fmin = 8.0
-    freqs = fmin * 2.0 ** (np.arange(n_bins) / bins_per_octave)
-
-    importances = rf_model.feature_importances_
-    mean_importances = importances[:n_bins]
-    std_importances = importances[n_bins:]
-    total_importance = mean_importances + std_importances
-
-    # Cumulative plot (≤ 100 Hz)
-    mask = freqs <= 100
-    sorted_idx = np.argsort(freqs[mask])
-    sorted_freqs = freqs[mask][sorted_idx]
-    sorted_importance = total_importance[mask][sorted_idx]
-    cumulative = np.cumsum(sorted_importance)
-    cumulative /= cumulative[-1]
-
-    plt.figure(figsize=(10, 6))
-    plt.plot(sorted_freqs, cumulative, color='purple')
-    plt.xlabel("Frequency (Hz)")
-    plt.ylabel("Cumulative Importance (0–1)")
-    plt.title(f"{title_prefix}: Cumulative Importance")
+    plt.figure(figsize=(10, 5))
+    plt.plot(cumulative, marker='o', label="Cumulative Importance")
+    plt.axhline(y=0.95, color='r', linestyle='--', label="95% Threshold")
+    plt.xlabel("Top-K Features")
+    plt.ylabel("Cumulative Importance")
+    plt.title("Cumulative Feature Importance (Random Forest)")
     plt.grid(True)
-    plt.xscale("log")
-    plt.xlim(0, 100)
-    plt.gca().xaxis.set_major_formatter(ticker.ScalarFormatter())
-    plt.tight_layout()
-    plt.savefig(f"{save_dir}/cumulative_importance.png")
-    plt.show()
-    print(f"Saved: {save_dir}/cumulative_importance.png")
+    plt.legend()
+    os.makedirs("results", exist_ok=True)
+    plt.savefig(save_path)
+    plt.close()
 
-    # Dynamic Binning (~1/3 octave bands ≤ 100 Hz)
-    max_freq = 100
-    step_hz = 1 / 3
-    num_bins = int(np.log2(max_freq / fmin) / step_hz) + 1
-    dynamic_bins = [fmin * (2 ** (i * step_hz)) for i in range(num_bins)]
+def plot_model_evaluation_curves(y_true, y_pred, y_scores=None, prefix="rf"):
+    os.makedirs("results", exist_ok=True)
 
-    bin_labels = []
-    bin_values = []
+    # Confusion Matrix
+    cm = confusion_matrix(y_true, y_pred)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+    disp.plot()
+    plt.title(f"Confusion Matrix: {prefix.upper()}")
+    plt.savefig(f"results/confusion_matrix_{prefix}.png")
+    plt.close()
 
-    for i in range(len(dynamic_bins) - 1):
-        low, high = dynamic_bins[i], dynamic_bins[i + 1]
-        in_bin = (freqs >= low) & (freqs < high)
-        if np.any(in_bin):
-            avg_importance = np.mean(total_importance[in_bin])
-            bin_values.append(avg_importance)
-            bin_labels.append(f"{int(low)}–{int(high)} Hz")
+    # ROC Curve
+    if y_scores is None:
+        raise ValueError("y_scores must be provided to plot ROC curve")
+    fpr, tpr, _ = roc_curve(y_true, y_scores)
+    roc_auc = auc(fpr, tpr)
+    plt.figure()
+    plt.plot(fpr, tpr, label=f"AUC = {roc_auc:.2f}")
+    plt.plot([0, 1], [0, 1], "k--")
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
+    plt.title(f"ROC Curve: {prefix.upper()}")
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(f"results/roc_curve_{prefix}.png")
+    plt.close()
 
-    plt.figure(figsize=(12, 6))
-    plt.bar(bin_labels, bin_values, color="darkgreen")
-    plt.xlabel("Frequency Band (~1/3 Octave)")
-    plt.ylabel("Avg Importance")
-    plt.title(f"{title_prefix}: Dynamic Binned Importance (≤ 100 Hz)")
-    plt.xticks(rotation=45, ha="right")
-    plt.tight_layout()
-    plt.savefig(f"{save_dir}/dynamic_binned_importance.png")
-    plt.show()
-    print(f"Saved: {save_dir}/dynamic_binned_importance.png")
+    # PR Curve
+    prec, recall, _ = precision_recall_curve(y_true, y_scores)
+    plt.figure()
+    plt.plot(recall, prec)
+    plt.xlabel("Recall")
+    plt.ylabel("Precision")
+    plt.title(f"Precision-Recall Curve: {prefix.upper()}")
+    plt.grid(True)
+    plt.savefig(f"results/pr_curve_{prefix}.png")
+    plt.close()
+
+# Example call in RF evaluation pipeline
+if __name__ == "__main__":
+    from sklearn.model_selection import train_test_split
+    from sklearn.metrics import accuracy_score, precision_score
+
+    # Dummy data for testing integration (replace with actual preprocessed dataset)
+    X = np.random.rand(100, 10)
+    y = np.random.randint(0, 2, size=100)
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+    rf = train_random_forest(X_train, y_train)
+
+    y_scores = rf.predict_proba(X_test)[:, 1]
+    y_pred = rf.predict(X_test)
+
+    # Save evaluation plots
+    plot_model_evaluation_curves(y_test, y_pred, y_scores, prefix="rf")
+    plot_cumulative_and_dynamic_importance(rf, save_path="results/feature_importance_rf.png")
