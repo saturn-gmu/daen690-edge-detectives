@@ -29,7 +29,8 @@ if FEATURES_PKL_PATH.exists():
     df = pd.read_pickle(FEATURES_PKL_PATH)
 else:
     print("🚧 Preprocessed features not found, running audio preprocessing pipeline...")
-    from src.data.preprocess import load_data_and_extract_features
+    from src.data.dataloader import load_data_and_extract_features #there are two almost identical functions in different files. the dataloader file worked for me
+    # instead of scr.data.preprocess
     df = load_data_and_extract_features(folder_path, vesselnames, vessel)
 
 if df.empty:
