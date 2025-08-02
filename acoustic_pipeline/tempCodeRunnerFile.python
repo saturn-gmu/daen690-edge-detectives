@@ -1,0 +1,23 @@
+import pandas as pd
+from pathlib import Path
+import argparse
+
+def inspect_parquet(parquet_path):
+    if not Path(parquet_path).exists():
+        print(f"❌ File not found: {parquet_path}")
+        return
+
+    try:
+        df = pd.read_parquet(parquet_path)
+        print(f"📊 Loaded DataFrame with {len(df)} rows and {len(df.columns)} columns\n")
+        print("🧾 Column Names and Types:")
+        print(df.dtypes)
+    except Exception as e:
+        print(f"❌ Failed to read {parquet_path}: {e}")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--path", type=str, required=True, help="Path to the .parquet file")
+
+    args = parser.parse_args()
+    inspect_parquet(args.path)
